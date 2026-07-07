@@ -1,0 +1,82 @@
+# DynaBoard
+
+This repository contains DynaBoard, a small Python benchmark generator for single-player
+board-game reasoning tasks.  Each puzzle randomizes:
+
+- board dimensions and numbered spaces
+- start and goal positions
+- blocked spaces
+- optional bidirectional portals
+- turn-dependent movement rules
+- optional periodic wind effects
+
+The included solver is deterministic breadth-first search over the finite game
+state, so each emitted answer key is the shortest sequence of chosen moves.
+
+## Usage
+
+Generate a JSONL dataset:
+
+```bash
+python3 dynaboard.py generate --seed 123 --count 100 --output dynaboard_games.jsonl
+```
+
+Create a `.env` file with your OpenRouter settings:
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-your-key
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+```
+
+Run the benchmark against the generated dataset:
+
+```bash
+python3 dynaboard.py run --dataset dynaboard_games.jsonl --output results.jsonl
+```
+
+You can override the model at run time:
+
+```bash
+python3 dynaboard.py run --dataset dynaboard_games.jsonl --model anthropic/claude-3.5-haiku
+```
+
+For a quick smoke test, run only the first few records:
+
+```bash
+python3 dynaboard.py run --dataset dynaboard_games.jsonl --limit 5
+```
+
+Some reasoning-heavy OpenRouter models may need more completion budget before
+they produce a final JSON answer. The runner defaults to `--max-tokens 2048`;
+increase it if you see a max-token error:
+
+```bash
+python3 dynaboard.py run --dataset dynaboard_games.jsonl --limit 1 --max-tokens 4096
+```
+
+Generate readable prompts and answer keys:
+
+```bash
+python3 dynaboard.py generate --seed 123 --count 3 --format text
+```
+
+Each JSONL record includes:
+
+- `id`: stable instance id
+- `prompt`: natural-language model prompt
+- `answer`: shortest move sequence and traced path
+- `game`: structured game definition
+
+Each result JSONL record includes:
+
+- `id`: benchmark instance id
+- `model`: OpenRouter model name
+- `response`: raw model response
+- `exact`: whether the returned move list exactly matched the answer key
+- `predicted_moves` and `expected_moves`
+
+Run tests:
+
+```bash
+python3 -m unittest
+```
