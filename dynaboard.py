@@ -497,7 +497,10 @@ def call_openrouter(
             },
             {"role": "user", "content": prompt},
         ],
-        "temperature": temperature
+        "temperature": temperature,
+        "reasoning": {
+            "effort": "medium"
+        }
     }
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
