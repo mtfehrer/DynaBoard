@@ -632,7 +632,7 @@ def _normalize_move(move: str) -> str:
 def run_benchmark(args: argparse.Namespace) -> None:
     env = {**load_env_file(args.env), **os.environ}
     api_key = args.api_key or env.get("OPENROUTER_API_KEY")
-    model = args.model or env.get("OPENROUTER_MODEL")
+    model = env.get("OPENROUTER_MODEL")
     base_url = env.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
     log_path = getattr(args, "log", None)
     if not api_key:
@@ -751,7 +751,6 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--log", help="write per-instance JSONL logs with reasoning and output")
     run.add_argument("--env", default=".env", help="dotenv file containing OpenRouter settings")
     run.add_argument("--api-key", help="OpenRouter API key; defaults to OPENROUTER_API_KEY")
-    run.add_argument("--model", help="OpenRouter model; defaults to OPENROUTER_MODEL")
     run.add_argument("--limit", type=int, help="only run the first N records")
     run.add_argument("--temperature", type=float, default=0.0)
     run.add_argument("--max-tokens", type=int, default=2048)

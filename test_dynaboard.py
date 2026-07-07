@@ -130,6 +130,8 @@ class DynaBoardTests(unittest.TestCase):
             log = Path(tmpdir) / "logs.jsonl"
             record = to_record(generate_instance(seed=23, index=0))
             dataset.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            env_path = Path(tmpdir) / ".env"
+            env_path.write_text("OPENROUTER_MODEL=test/model\n", encoding="utf-8")
 
             def fake_call_openrouter(**_kwargs: object) -> ModelResponse:
                 return ModelResponse(
@@ -145,9 +147,8 @@ class DynaBoardTests(unittest.TestCase):
                         dataset=str(dataset),
                         output=None,
                         log=str(log),
-                        env=str(Path(tmpdir) / ".env"),
+                        env=str(env_path),
                         api_key="test-key",
-                        model="test/model",
                         limit=None,
                         temperature=0.0,
                         max_tokens=2048,

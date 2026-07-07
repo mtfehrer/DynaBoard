@@ -40,12 +40,6 @@ Write per-test-case reasoning and output logs while running the benchmark:
 python3 dynaboard.py run --dataset dynaboard_games.jsonl --output results.jsonl --log logs.jsonl
 ```
 
-You can override the model at run time:
-
-```bash
-python3 dynaboard.py run --dataset dynaboard_games.jsonl --model anthropic/claude-3.5-haiku
-```
-
 For a quick smoke test, run only the first few records:
 
 ```bash
