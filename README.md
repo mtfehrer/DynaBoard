@@ -34,6 +34,12 @@ Run the benchmark against the generated dataset:
 python3 dynaboard.py run --dataset dynaboard_games.jsonl --output results.jsonl
 ```
 
+Write per-test-case reasoning and output logs while running the benchmark:
+
+```bash
+python3 dynaboard.py run --dataset dynaboard_games.jsonl --output results.jsonl --log logs.jsonl
+```
+
 You can override the model at run time:
 
 ```bash
@@ -66,6 +72,14 @@ Each result JSONL record includes:
 - `response`: raw model response
 - `exact`: whether the returned move list exactly matched the answer key
 - `predicted_moves` and `expected_moves`
+
+Each log JSONL record includes:
+
+- `id`: benchmark instance id
+- `model`: OpenRouter model name
+- `reasoning`: provider reasoning text, when returned
+- `reasoning_details`: provider structured reasoning details, when returned
+- `output`: final model output used for scoring
 
 Run tests:
 

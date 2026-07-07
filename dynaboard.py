@@ -79,6 +79,13 @@ class Solution:
     path: tuple[Step, ...]
 
 
+@dataclass(frozen=True)
+class ModelResponse:
+    output: str
+    reasoning: object | None = None
+    reasoning_details: object | None = None
+
+
 MOVE_POOL = (
     Move("hop north 1", 0, -1),
     Move("hop south 1", 0, 1),
@@ -477,7 +484,7 @@ def call_openrouter(
     max_tokens: int,
     timeout: int,
     base_url: str = "https://openrouter.ai/api/v1",
-) -> str:
+) -> ModelResponse:
     payload = {
         "model": model,
         "messages": [
@@ -524,7 +531,13 @@ def call_openrouter(
                 "OpenRouter returned no final answer because the model hit the max token limit; "
             )
         raise RuntimeError(f"unexpected OpenRouter message content: {content!r}")
-    return content
+    if not isinstance(message, dict):
+        raise RuntimeError(f"unexpected OpenRouter message: {message!r}")
+    return ModelResponse(
+        output=content,
+        reasoning=message.get("reasoning"),
+        reasoning_details=message.get("reasoning_details"),
+    )
 
 
 def extract_moves(text: str) -> list[str]:
@@ -621,6 +634,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
     api_key = args.api_key or env.get("OPENROUTER_API_KEY")
     model = args.model or env.get("OPENROUTER_MODEL")
     base_url = env.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    log_path = getattr(args, "log", None)
     if not api_key:
         raise SystemExit("missing OPENROUTER_API_KEY; add it to .env or pass --api-key")
     if not model:
@@ -632,6 +646,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
 
     correct = 0
     results: list[dict[str, object]] = []
+    logs: list[dict[str, object]] = []
     for index, record in enumerate(records, start=1):
         prompt = record.get("prompt")
         answer = record.get("answer")
@@ -641,7 +656,7 @@ def run_benchmark(args: argparse.Namespace) -> None:
         game = game_from_record(record)
         started = time.time()
         try:
-            response = call_openrouter(
+            model_response = call_openrouter(
                 prompt=prompt,
                 api_key=api_key,
                 model=model,
@@ -651,16 +666,31 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 base_url=base_url,
             )
         except RuntimeError as exc:
+            latency_seconds = round(time.time() - started, 3)
             result = {
                 "id": record.get("id"),
                 "model": model,
                 "error": str(exc),
-                "latency_seconds": round(time.time() - started, 3),
+                "latency_seconds": latency_seconds,
                 "correct": False,
             }
             results.append(result)
+            logs.append(
+                {
+                    "id": record.get("id"),
+                    "model": model,
+                    "reasoning": None,
+                    "reasoning_details": None,
+                    "output": None,
+                    "error": str(exc),
+                    "latency_seconds": latency_seconds,
+                }
+            )
             print(f"[{index}/{len(records)}] {record.get('id')}: error: {exc}")
             continue
+        if isinstance(model_response, str):
+            model_response = ModelResponse(output=model_response)
+        response = model_response.output
         predicted = extract_moves(response)
         score = score_moves(predicted, expected, game)
         score["latency_seconds"] = round(time.time() - started, 3)
@@ -673,6 +703,17 @@ def run_benchmark(args: argparse.Namespace) -> None:
             **score,
         }
         results.append(result)
+        logs.append(
+            {
+                "id": record.get("id"),
+                "model": model,
+                "reasoning": model_response.reasoning,
+                "reasoning_details": model_response.reasoning_details,
+                "output": model_response.output,
+                "correct": score["correct"],
+                "latency_seconds": score["latency_seconds"],
+            }
+        )
         print(
             f"[{index}/{len(records)}] {record.get('id')}: "
             f"{'correct' if score['correct'] else 'wrong'}"
@@ -681,12 +722,17 @@ def run_benchmark(args: argparse.Namespace) -> None:
     output_body = "".join(json.dumps(result, sort_keys=True) + "\n" for result in results)
     if args.output:
         Path(args.output).write_text(output_body, encoding="utf-8")
+    if log_path:
+        log_body = "".join(json.dumps(log, sort_keys=True) + "\n" for log in logs)
+        Path(log_path).write_text(log_body, encoding="utf-8")
 
     total = len(records)
     accuracy = correct / total if total else 0.0
     print(f"Accuracy: {correct}/{total} ({accuracy:.1%})")
     if args.output:
         print(f"Wrote results to {args.output}")
+    if log_path:
+        print(f"Wrote logs to {log_path}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -702,6 +748,7 @@ def parse_args() -> argparse.Namespace:
     run = subparsers.add_parser("run", help="run a JSONL dataset against an OpenRouter model")
     run.add_argument("--dataset", required=True, help="JSONL dataset generated by this script")
     run.add_argument("--output", "-o", help="write per-instance JSONL results")
+    run.add_argument("--log", help="write per-instance JSONL logs with reasoning and output")
     run.add_argument("--env", default=".env", help="dotenv file containing OpenRouter settings")
     run.add_argument("--api-key", help="OpenRouter API key; defaults to OPENROUTER_API_KEY")
     run.add_argument("--model", help="OpenRouter model; defaults to OPENROUTER_MODEL")

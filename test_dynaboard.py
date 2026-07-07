@@ -1,9 +1,13 @@
+import argparse
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import dynaboard
 from dynaboard import (
     GameInstance,
+    ModelResponse,
     Move,
     TurnRule,
     WindRule,
@@ -13,6 +17,7 @@ from dynaboard import (
     game_from_record,
     load_env_file,
     replay_moves,
+    run_benchmark,
     score_moves,
     solve,
     to_record,
@@ -118,6 +123,46 @@ class DynaBoardTests(unittest.TestCase):
         self.assertTrue(score["valid"])
         self.assertTrue(score["optimal"])
         self.assertTrue(score["correct"])
+
+    def test_run_benchmark_writes_reasoning_logs(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            dataset = Path(tmpdir) / "dataset.jsonl"
+            log = Path(tmpdir) / "logs.jsonl"
+            record = to_record(generate_instance(seed=23, index=0))
+            dataset.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+            def fake_call_openrouter(**_kwargs: object) -> ModelResponse:
+                return ModelResponse(
+                    output=json.dumps({"moves": record["answer"]["moves"]}),
+                    reasoning="matched each turn against the changing move rules",
+                )
+
+            original_call_openrouter = dynaboard.call_openrouter
+            dynaboard.call_openrouter = fake_call_openrouter
+            try:
+                run_benchmark(
+                    argparse.Namespace(
+                        dataset=str(dataset),
+                        output=None,
+                        log=str(log),
+                        env=str(Path(tmpdir) / ".env"),
+                        api_key="test-key",
+                        model="test/model",
+                        limit=None,
+                        temperature=0.0,
+                        max_tokens=2048,
+                        timeout=60,
+                    )
+                )
+            finally:
+                dynaboard.call_openrouter = original_call_openrouter
+
+            log_records = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(log_records), 1)
+            self.assertEqual(log_records[0]["id"], record["id"])
+            self.assertEqual(log_records[0]["model"], "test/model")
+            self.assertEqual(log_records[0]["reasoning"], "matched each turn against the changing move rules")
+            self.assertEqual(json.loads(log_records[0]["output"])["moves"], record["answer"]["moves"])
 
 
 if __name__ == "__main__":
