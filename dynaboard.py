@@ -490,8 +490,7 @@ def call_openrouter(
             },
             {"role": "user", "content": prompt},
         ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
+        "temperature": temperature
     }
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -523,7 +522,6 @@ def call_openrouter(
         if body.get("choices") and body["choices"][0].get("finish_reason") == "length":
             raise RuntimeError(
                 "OpenRouter returned no final answer because the model hit the max token limit; "
-                "try a larger --max-tokens value or a less reasoning-heavy model"
             )
         raise RuntimeError(f"unexpected OpenRouter message content: {content!r}")
     return content

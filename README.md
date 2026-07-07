@@ -46,14 +46,6 @@ For a quick smoke test, run only the first few records:
 python3 dynaboard.py run --dataset dynaboard_games.jsonl --limit 5
 ```
 
-Some reasoning-heavy OpenRouter models may need more completion budget before
-they produce a final JSON answer. The runner defaults to `--max-tokens 2048`;
-increase it if you see a max-token error:
-
-```bash
-python3 dynaboard.py run --dataset dynaboard_games.jsonl --limit 1 --max-tokens 4096
-```
-
 Generate readable prompts and answer keys:
 
 ```bash
