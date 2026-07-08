@@ -395,18 +395,29 @@ def _phase_label(phase: int, cycle: int) -> str:
     return f"turns congruent to {phase + 1} modulo {cycle} ({turn_numbers}, ...)"
 
 
+def _coord_text(space: int, width: int) -> str:
+    x, y = space_to_coord(space, width)
+    return f"(row {y + 1}, column {x + 1})"
+
+
 def render_prompt(game: GameInstance) -> str:
     lines = [
         "You are playing a one-player board game.",
-        f"The board is a {game.height}x{game.width} rectangle (height x width, i.e., {game.height} rows and {game.width} columns) with spaces numbered 1 to {game.height * game.width} from left to right, top to bottom.",
-        f"You start on space {game.start}. Your goal is to finish a turn on space {game.goal}. The game begins on turn 1 (your first move is turn 1).",
+        f"The board is a {game.height}x{game.width} rectangle (height x width, i.e., {game.height} rows and {game.width} columns). "
+        f"Rows are numbered 1 to {game.height} from top to bottom, and columns are numbered 1 to {game.width} from left to right.",
+        f"You start at {_coord_text(game.start, game.width)}. Your goal is to finish a turn at {_coord_text(game.goal, game.width)}. The game begins on turn 1 (your first move is turn 1).",
     ]
     if game.blocked:
-        lines.append(f"You must remain within the board boundaries at all times (no moves may take you off the board) and you may not land on blocked spaces: {_join_numbers(game.blocked)}. Moves only check the destination space, meaning you can jump over or cross blocked spaces as long as you do not land on them.")
+        blocked_coords = ", ".join(_coord_text(b, game.width) for b in game.blocked)
+        lines.append(
+            "You must remain within the board boundaries at all times (no moves may take you off the board) and "
+            f"you may not land on blocked spaces: {blocked_coords}. Moves only check the destination space, meaning "
+            "you can jump over or cross blocked spaces as long as you do not land on them."
+        )
     else:
         lines.append("You must remain within the board boundaries at all times (no moves may take you off the board). There are no blocked spaces.")
     if game.portals:
-        pairs = "; ".join(f"{a}<->{b}" for a, b in game.portals)
+        pairs = "; ".join(f"{_coord_text(a, game.width)}<->{_coord_text(b, game.width)}" for a, b in game.portals)
         lines.append(
             f"Portal pairs are {pairs}. Landing on either portal immediately moves you to its pair. "
             "Teleportation only triggers once per landing event. When a move or wind gust lands you on a portal space, "
