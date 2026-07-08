@@ -41,11 +41,31 @@ class DynaBoardTests(unittest.TestCase):
             self.assertLessEqual(solution.turns, game.max_turns)
             self.assertEqual(solution.path[-1].final_space, game.goal)
 
+    def test_generate_instance_supports_difficulty_profiles(self) -> None:
+        easy = generate_instance(seed=31, index=0, difficulty="easy")
+        easy_solution = solve(easy)
+        self.assertEqual(easy.difficulty, "easy")
+        self.assertEqual(len(easy.rules), 1)
+        self.assertEqual(easy.rules[0].label, "every turn")
+        self.assertEqual(easy.blocked, ())
+        self.assertEqual(easy.portals, ())
+        self.assertIsNone(easy.wind)
+        self.assertLessEqual(easy_solution.turns, 6)
+
+        medium = generate_instance(seed=31, index=0, difficulty="medium")
+        medium_solution = solve(medium)
+        self.assertEqual(medium.difficulty, "medium")
+        self.assertIn(len(medium.rules), (2, 3))
+        self.assertLessEqual(len(medium.blocked), 3)
+        self.assertLessEqual(len(medium.portals), 1)
+        self.assertLessEqual(medium_solution.turns, 10)
+
     def test_record_contains_prompt_and_answer_key(self) -> None:
         game = generate_instance(seed=5, index=0)
         record = to_record(game)
         self.assertIn("prompt", record)
         self.assertIn("answer", record)
+        self.assertEqual(record["difficulty"], "hard")
         self.assertIn("Movement rules change by turn", record["prompt"])
         self.assertIn('"moves"', record["prompt"])
         self.assertTrue(record["answer"]["solvable"])
@@ -75,11 +95,12 @@ class DynaBoardTests(unittest.TestCase):
     def test_generate_dataset_writes_jsonl(self) -> None:
         with TemporaryDirectory() as tmpdir:
             output = Path(tmpdir) / "dataset.jsonl"
-            generate_dataset(seed=11, count=2, output=str(output), output_format="jsonl")
+            generate_dataset(seed=11, count=2, output=str(output), output_format="jsonl", difficulty="easy")
             records = [line for line in output.read_text(encoding="utf-8").splitlines() if line]
             self.assertEqual(len(records), 2)
             self.assertIn('"prompt"', records[0])
             self.assertIn('"answer"', records[0])
+            self.assertEqual(json.loads(records[0])["difficulty"], "easy")
 
     def test_load_env_file(self) -> None:
         with TemporaryDirectory() as tmpdir:

@@ -58,6 +58,25 @@ class GameInstance:
     rules: tuple[TurnRule, ...]
     wind: WindRule | None
     max_turns: int
+    difficulty: str = "hard"
+
+
+@dataclass(frozen=True)
+class DifficultyProfile:
+    name: str
+    width_range: tuple[int, int]
+    height_range: tuple[int, int]
+    min_spaces: int
+    max_blocked: int
+    blocked_divisor: int
+    portal_chance: float
+    max_portal_pairs: int
+    cycle_range: tuple[int, int]
+    move_count_range: tuple[int, int]
+    wind_chance: float
+    wind_period_range: tuple[int, int]
+    move_pool: tuple[Move, ...]
+    max_solution_turns: int | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +127,60 @@ MOVE_POOL = (
     Move("knight west-north", -2, -1),
     Move("knight west-south", -2, 1),
 )
+
+BASIC_MOVE_POOL = MOVE_POOL[:4]
+INTERMEDIATE_MOVE_POOL = MOVE_POOL[:12]
+
+DIFFICULTY_PROFILES = {
+    "easy": DifficultyProfile(
+        name="easy",
+        width_range=(3, 5),
+        height_range=(3, 5),
+        min_spaces=9,
+        max_blocked=0,
+        blocked_divisor=1,
+        portal_chance=0.0,
+        max_portal_pairs=0,
+        cycle_range=(1, 1),
+        move_count_range=(2, 3),
+        wind_chance=0.0,
+        wind_period_range=(2, 2),
+        move_pool=BASIC_MOVE_POOL,
+        max_solution_turns=6,
+    ),
+    "medium": DifficultyProfile(
+        name="medium",
+        width_range=(4, 6),
+        height_range=(4, 6),
+        min_spaces=12,
+        max_blocked=3,
+        blocked_divisor=6,
+        portal_chance=0.25,
+        max_portal_pairs=1,
+        cycle_range=(2, 3),
+        move_count_range=(2, 3),
+        wind_chance=0.3,
+        wind_period_range=(3, 5),
+        move_pool=INTERMEDIATE_MOVE_POOL,
+        max_solution_turns=10,
+    ),
+    "hard": DifficultyProfile(
+        name="hard",
+        width_range=(1, 7),
+        height_range=(1, 7),
+        min_spaces=8,
+        max_blocked=5,
+        blocked_divisor=5,
+        portal_chance=0.55,
+        max_portal_pairs=2,
+        cycle_range=(2, 4),
+        move_count_range=(2, 4),
+        wind_chance=0.65,
+        wind_period_range=(2, 5),
+        move_pool=MOVE_POOL,
+        max_solution_turns=None,
+    ),
+}
 
 
 def space_to_coord(space: int, width: int) -> Coord:
@@ -206,15 +279,28 @@ def solve(game: GameInstance) -> Solution:
     return Solution(False, None, (), ())
 
 
-def generate_instance(seed: int, index: int = 0, max_attempts: int = 500) -> GameInstance:
+def generate_instance(
+    seed: int,
+    index: int = 0,
+    max_attempts: int = 500,
+    difficulty: str = "hard",
+) -> GameInstance:
     """Generate one deterministic, solvable puzzle from ``seed`` and ``index``."""
+    profile = _difficulty_profile(difficulty)
     rng = random.Random(seed * 1_000_003 + index)
     for attempt in range(max_attempts):
-        width = rng.randint(1, 7)
-        height = rng.randint(1, 7)
-        if width * height < 8:
-            height = max(height, 2)
-            width = max(width, 4)
+        width = rng.randint(*profile.width_range)
+        height = rng.randint(*profile.height_range)
+        if width * height < profile.min_spaces:
+            if profile.name == "hard":
+                height = max(height, 2)
+                width = max(width, 4)
+            else:
+                while width * height < profile.min_spaces:
+                    if width <= height:
+                        width += 1
+                    else:
+                        height += 1
         total_spaces = width * height
 
         start = rng.randint(1, total_spaces)
@@ -222,27 +308,28 @@ def generate_instance(seed: int, index: int = 0, max_attempts: int = 500) -> Gam
         while goal == start:
             goal = rng.randint(1, total_spaces)
 
-        blocked_count = rng.randint(0, min(5, max(0, total_spaces // 5)))
+        blocked_limit = min(profile.max_blocked, max(0, total_spaces // profile.blocked_divisor))
+        blocked_count = rng.randint(0, blocked_limit)
         unavailable = {start, goal}
         blocked = set(rng.sample([s for s in range(1, total_spaces + 1) if s not in unavailable], blocked_count))
 
         portal_pairs: list[tuple[int, int]] = []
-        if total_spaces >= 12 and rng.random() < 0.55:
+        if total_spaces >= 12 and rng.random() < profile.portal_chance:
             candidates = [s for s in range(1, total_spaces + 1) if s not in unavailable and s not in blocked]
             rng.shuffle(candidates)
-            pair_count = min(rng.randint(1, 2), len(candidates) // 2)
+            pair_count = min(rng.randint(1, profile.max_portal_pairs), len(candidates) // 2)
             for pair_index in range(pair_count):
                 a = candidates[2 * pair_index]
                 b = candidates[2 * pair_index + 1]
                 portal_pairs.append(tuple(sorted((a, b))))
 
-        cycle = rng.randint(2, 4)
-        shuffled_moves = list(MOVE_POOL)
+        cycle = rng.randint(*profile.cycle_range)
+        shuffled_moves = list(profile.move_pool)
         rng.shuffle(shuffled_moves)
         rules: list[TurnRule] = []
         cursor = 0
         for phase in range(cycle):
-            move_count = rng.randint(2, 4)
+            move_count = rng.randint(*profile.move_count_range)
             selected = shuffled_moves[cursor : cursor + move_count]
             cursor += move_count
             if len(selected) < move_count:
@@ -252,7 +339,7 @@ def generate_instance(seed: int, index: int = 0, max_attempts: int = 500) -> Gam
             rules.append(TurnRule(label, tuple(selected)))
 
         wind = None
-        if rng.random() < 0.65:
+        if rng.random() < profile.wind_chance:
             wind_move = rng.choice(
                 (
                     Move("one space north", 0, -1),
@@ -261,10 +348,10 @@ def generate_instance(seed: int, index: int = 0, max_attempts: int = 500) -> Gam
                     Move("one space west", -1, 0),
                 )
             )
-            wind = WindRule(period=rng.randint(2, 5), move=wind_move)
+            wind = WindRule(period=rng.randint(*profile.wind_period_range), move=wind_move)
 
         game = GameInstance(
-            instance_id=f"dynaboard-{seed}-{index}-{attempt}",
+            instance_id=_instance_id(profile.name, seed, index, attempt),
             width=width,
             height=height,
             start=start,
@@ -274,15 +361,35 @@ def generate_instance(seed: int, index: int = 0, max_attempts: int = 500) -> Gam
             rules=tuple(rules),
             wind=wind,
             max_turns=max(12, total_spaces * 3),
+            difficulty=profile.name,
         )
         solution = solve(game)
-        if solution.solvable and 2 <= (solution.turns or 0) <= game.max_turns:
+        max_solution_turns = profile.max_solution_turns or game.max_turns
+        if solution.solvable and 2 <= (solution.turns or 0) <= max_solution_turns:
             return game
 
-    raise RuntimeError(f"could not generate a solvable puzzle for seed={seed} index={index}")
+    raise RuntimeError(
+        f"could not generate a {profile.name} solvable puzzle for seed={seed} index={index}"
+    )
+
+
+def _difficulty_profile(difficulty: str) -> DifficultyProfile:
+    try:
+        return DIFFICULTY_PROFILES[difficulty]
+    except KeyError as exc:
+        choices = ", ".join(sorted(DIFFICULTY_PROFILES))
+        raise ValueError(f"unknown difficulty {difficulty!r}; choose one of: {choices}") from exc
+
+
+def _instance_id(difficulty: str, seed: int, index: int, attempt: int) -> str:
+    if difficulty == "hard":
+        return f"dynaboard-{seed}-{index}-{attempt}"
+    return f"dynaboard-{difficulty}-{seed}-{index}-{attempt}"
 
 
 def _phase_label(phase: int, cycle: int) -> str:
+    if cycle == 1:
+        return "every turn"
     if cycle == 2:
         return "odd-numbered turns" if phase == 0 else "even-numbered turns"
     turn_numbers = ", ".join(str(phase + 1 + cycle * n) for n in range(3))
@@ -362,6 +469,7 @@ def to_record(game: GameInstance) -> dict[str, object]:
     solution = solve(game)
     return {
         "id": game.instance_id,
+        "difficulty": game.difficulty,
         "prompt": render_prompt(game),
         "answer": {
             "solvable": solution.solvable,
@@ -403,6 +511,7 @@ def game_from_record(record: dict[str, object]) -> GameInstance:
         rules=rules,
         wind=wind,
         max_turns=int(game["max_turns"]),
+        difficulty=str(game.get("difficulty", "hard")),
     )
 
 
@@ -428,8 +537,15 @@ def load_env_file(path: str = ".env") -> dict[str, str]:
     return values
 
 
-def generate_dataset(seed: int, count: int, output: str | None, output_format: str) -> None:
-    records = [to_record(generate_instance(seed, index)) for index in range(count)]
+def generate_dataset(
+    seed: int,
+    count: int,
+    output: str | None,
+    output_format: str,
+    difficulty: str = "hard",
+) -> None:
+    _difficulty_profile(difficulty)
+    records = [to_record(generate_instance(seed, index, difficulty=difficulty)) for index in range(count)]
     if output_format == "jsonl":
         body = "".join(json.dumps(record, sort_keys=True) + "\n" for record in records)
     else:
@@ -745,6 +861,12 @@ def parse_args() -> argparse.Namespace:
     generate = subparsers.add_parser("generate", help="generate a benchmark dataset")
     generate.add_argument("--seed", type=int, default=1, help="base random seed")
     generate.add_argument("--count", type=int, default=3, help="number of instances to generate")
+    generate.add_argument(
+        "--difficulty",
+        choices=tuple(DIFFICULTY_PROFILES),
+        default="hard",
+        help="dataset difficulty profile",
+    )
     generate.add_argument("--format", choices=("jsonl", "text"), default="jsonl", help="output format")
     generate.add_argument("--output", "-o", help="output file; defaults to stdout")
 
@@ -761,6 +883,12 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--seed", type=int, default=1, help=argparse.SUPPRESS)
     parser.add_argument("--count", type=int, default=3, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--difficulty",
+        choices=tuple(DIFFICULTY_PROFILES),
+        default="hard",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--format", choices=("jsonl", "text"), default="text", help=argparse.SUPPRESS)
     return parser.parse_args()
 
@@ -770,7 +898,7 @@ def main() -> None:
     if args.command == "run":
         run_benchmark(args)
     else:
-        generate_dataset(args.seed, args.count, getattr(args, "output", None), args.format)
+        generate_dataset(args.seed, args.count, getattr(args, "output", None), args.format, args.difficulty)
 
 
 if __name__ == "__main__":

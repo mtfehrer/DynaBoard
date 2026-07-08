@@ -21,6 +21,19 @@ Generate a JSONL dataset:
 python3 dynaboard.py generate --seed 123 --count 100 --output dynaboard_games.jsonl
 ```
 
+Choose a difficulty:
+
+```bash
+python3 dynaboard.py generate --seed 123 --count 100 --difficulty easy --output dynaboard_easy.jsonl
+python3 dynaboard.py generate --seed 123 --count 100 --difficulty medium --output dynaboard_medium.jsonl
+python3 dynaboard.py generate --seed 123 --count 100 --difficulty hard --output dynaboard_hard.jsonl
+```
+
+`hard` is the original benchmark behavior. `easy` uses a single fixed movement
+rule with no blocked spaces, portals, or wind, and keeps shortest paths to at
+most 6 turns. `medium` uses smaller rule cycles and caps shortest paths at 10
+turns while allowing limited blocked spaces, portals, and wind.
+
 Create a `.env` file with your OpenRouter settings:
 
 ```bash
@@ -55,6 +68,7 @@ python3 dynaboard.py generate --seed 123 --count 3 --format text
 Each JSONL record includes:
 
 - `id`: stable instance id
+- `difficulty`: `easy`, `medium`, or `hard`
 - `prompt`: natural-language model prompt
 - `answer`: shortest move sequence and traced path
 - `game`: structured game definition
