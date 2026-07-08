@@ -102,7 +102,6 @@ class Solution:
 class ModelResponse:
     output: str
     reasoning: object | None = None
-    reasoning_details: object | None = None
 
 
 MOVE_POOL = (
@@ -399,7 +398,7 @@ def _phase_label(phase: int, cycle: int) -> str:
 def render_prompt(game: GameInstance) -> str:
     lines = [
         "You are playing a one-player board game.",
-        f"The board is a {game.height}x{game.width} rectangle with spaces numbered left to right, top to bottom.",
+        f"The board is a {game.height}x{game.width} rectangle (height x width, i.e., {game.height} rows and {game.width} columns) with spaces numbered left to right, top to bottom.",
         f"You start on space {game.start}. Your goal is to finish a turn on space {game.goal}.",
     ]
     if game.blocked:
@@ -426,8 +425,9 @@ def render_prompt(game: GameInstance) -> str:
         lines.append("There are no automatic wind effects.")
 
     lines.append(
-        "What is the shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? "
-        'Answer only as JSON in this form: {"moves": ["first move name", "second move name"]}.'
+        "What is the shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? ",
+        "Use the exact move names (e.g., use \"hop north 1\" rather than the description in parentheses \"1 north\"). ",
+        'Answer only as JSON in this form: {"moves": ["first move name", "second move name", ...]}.'
     )
     return "\n".join(lines)
 
@@ -655,7 +655,6 @@ def call_openrouter(
     return ModelResponse(
         output=content,
         reasoning=message.get("reasoning"),
-        reasoning_details=message.get("reasoning_details"),
     )
 
 
@@ -798,8 +797,8 @@ def run_benchmark(args: argparse.Namespace) -> None:
                 {
                     "id": record.get("id"),
                     "model": model,
+                    "prompt": prompt,
                     "reasoning": None,
-                    "reasoning_details": None,
                     "output": None,
                     "error": str(exc),
                     "latency_seconds": latency_seconds,
@@ -826,8 +825,8 @@ def run_benchmark(args: argparse.Namespace) -> None:
             {
                 "id": record.get("id"),
                 "model": model,
+                "prompt": prompt,
                 "reasoning": model_response.reasoning,
-                "reasoning_details": model_response.reasoning_details,
                 "output": model_response.output,
                 "correct": score["correct"],
                 "latency_seconds": score["latency_seconds"],

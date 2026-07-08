@@ -85,8 +85,8 @@ Each log JSONL record includes:
 
 - `id`: benchmark instance id
 - `model`: OpenRouter model name
+- `prompt`: the prompt the model sees
 - `reasoning`: provider reasoning text, when returned
-- `reasoning_details`: provider structured reasoning details, when returned
 - `output`: final model output used for scoring
 
 Run tests:

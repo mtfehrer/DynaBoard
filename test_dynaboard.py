@@ -183,6 +183,7 @@ class DynaBoardTests(unittest.TestCase):
             self.assertEqual(len(log_records), 1)
             self.assertEqual(log_records[0]["id"], record["id"])
             self.assertEqual(log_records[0]["model"], "test/model")
+            self.assertEqual(log_records[0]["prompt"], record["prompt"])
             self.assertEqual(log_records[0]["reasoning"], "matched each turn against the changing move rules")
             self.assertEqual(json.loads(log_records[0]["output"])["moves"], record["answer"]["moves"])
 
