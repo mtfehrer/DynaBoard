@@ -402,9 +402,9 @@ def render_prompt(game: GameInstance) -> str:
         f"You start on space {game.start}. Your goal is to finish a turn on space {game.goal}.",
     ]
     if game.blocked:
-        lines.append(f"You may not land on blocked spaces: {_join_numbers(game.blocked)}.")
+        lines.append(f"You must remain within the board boundaries at all times (no moves may take you off the board) and you may not land on blocked spaces: {_join_numbers(game.blocked)}.")
     else:
-        lines.append("There are no blocked spaces.")
+        lines.append("You must remain within the board boundaries at all times (no moves may take you off the board). There are no blocked spaces.")
     if game.portals:
         pairs = "; ".join(f"{a}<->{b}" for a, b in game.portals)
         lines.append(f"Portal pairs are {pairs}. Landing on either portal immediately moves you to its pair.")
@@ -424,9 +424,14 @@ def render_prompt(game: GameInstance) -> str:
     else:
         lines.append("There are no automatic wind effects.")
 
+    if game.portals and game.wind is not None:
+        lines.append(
+            "Note on sequence: If your chosen move lands on a portal, you teleport immediately before the wind gust push is evaluated (the wind will then push you from your teleported destination). If the wind gust subsequently pushes you onto a portal, you will teleport again."
+        )
+
     lines.append(
-        "What is the shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? ",
-        "Use the exact move names (e.g., use \"hop north 1\" rather than the description in parentheses \"1 north\"). ",
+        "What is the shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? "
+        "Use the exact move names (e.g., use \"hop north 1\" rather than the description in parentheses \"1 north\"). "
         'Answer only as JSON in this form: {"moves": ["first move name", "second move name", ...]}.'
     )
     return "\n".join(lines)
