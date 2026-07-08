@@ -398,16 +398,21 @@ def _phase_label(phase: int, cycle: int) -> str:
 def render_prompt(game: GameInstance) -> str:
     lines = [
         "You are playing a one-player board game.",
-        f"The board is a {game.height}x{game.width} rectangle (height x width, i.e., {game.height} rows and {game.width} columns) with spaces numbered left to right, top to bottom.",
-        f"You start on space {game.start}. Your goal is to finish a turn on space {game.goal}.",
+        f"The board is a {game.height}x{game.width} rectangle (height x width, i.e., {game.height} rows and {game.width} columns) with spaces numbered 1 to {game.height * game.width} from left to right, top to bottom.",
+        f"You start on space {game.start}. Your goal is to finish a turn on space {game.goal}. The game begins on turn 1 (your first move is turn 1).",
     ]
     if game.blocked:
-        lines.append(f"You must remain within the board boundaries at all times (no moves may take you off the board) and you may not land on blocked spaces: {_join_numbers(game.blocked)}.")
+        lines.append(f"You must remain within the board boundaries at all times (no moves may take you off the board) and you may not land on blocked spaces: {_join_numbers(game.blocked)}. Moves only check the destination space, meaning you can jump over or cross blocked spaces as long as you do not land on them.")
     else:
         lines.append("You must remain within the board boundaries at all times (no moves may take you off the board). There are no blocked spaces.")
     if game.portals:
         pairs = "; ".join(f"{a}<->{b}" for a, b in game.portals)
-        lines.append(f"Portal pairs are {pairs}. Landing on either portal immediately moves you to its pair.")
+        lines.append(
+            f"Portal pairs are {pairs}. Landing on either portal immediately moves you to its pair. "
+            "Teleportation only triggers once per landing event. When a move or wind gust lands you on a portal space, "
+            "you immediately teleport to its pair. You do not teleport back to the original space or chain "
+            "further teleports from that new space on the same event."
+        )
     else:
         lines.append("There are no portals.")
 
@@ -419,7 +424,8 @@ def render_prompt(game: GameInstance) -> str:
     if game.wind is not None:
         lines.append(
             f"After your chosen move on every turn divisible by {game.wind.period}, "
-            f"a gust tries to push you {game.wind.move.name}; if that push would leave the board or hit a blocked space, it does nothing."
+            f"a gust tries to push you {game.wind.move.name}; if that push would leave the board or hit a blocked space, it does nothing. "
+            f"A turn is only finished after resolving both your chosen move and any automatic wind gust."
         )
     else:
         lines.append("There are no automatic wind effects.")
@@ -430,7 +436,8 @@ def render_prompt(game: GameInstance) -> str:
         )
 
     lines.append(
-        "What is the shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? "
+        "What is a shortest sequence of chosen moves that makes you finish a turn exactly on the goal space? "
+        "If there are multiple valid sequences of the same minimum length, any of them is acceptable. "
         "Use the exact move names (e.g., use \"hop north 1\" rather than the description in parentheses \"1 north\"). "
         'Answer only as JSON in this form: {"moves": ["first move name", "second move name", ...]}.'
     )
@@ -438,7 +445,7 @@ def render_prompt(game: GameInstance) -> str:
 
 
 def _move_description(move: Move) -> str:
-    return f"{move.name} ({_delta_text(move.dx, move.dy)})"
+    return f'"{move.name}" ({_delta_text(move.dx, move.dy)})'
 
 
 def _delta_text(dx: int, dy: int) -> str:
