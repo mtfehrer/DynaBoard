@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Showcase and interactive visualizer for DynaBoard, a Python single-player board game reasoning benchmark for large language models.">
+  <title>DynaBoard - LLM Board Game Reasoning Benchmark</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- FontAwesome Icons for modern styling -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js for comparison charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="dark-theme">
+  <div class="app-container">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <i class="fa-solid fa-gamepad logo-icon"></i>
+        <span>DynaBoard</span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-target="dashboard" id="nav-dashboard-btn">
+          <i class="fa-solid fa-chart-line"></i> Dashboard
+        </button>
+        <button class="nav-btn" data-target="test-cases" id="nav-testcases-btn">
+          <i class="fa-solid fa-list-check"></i> Test Cases
+        </button>
+        <button class="nav-btn" data-target="visualizer" id="nav-visualizer-btn">
+          <i class="fa-solid fa-compass-drafting"></i> Game Visualizer
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <p>Single-Player Board Game Reasoning Suite</p>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Header -->
+      <header class="app-header">
+        <div class="header-title">
+          <h1 id="page-title">Benchmark Dashboard</h1>
+          <p class="subtitle" id="page-subtitle">Comparative analysis of language model performance on pathfinding rulesets.</p>
+        </div>
+        <div class="header-actions">
+          <button id="reload-data-btn" class="btn btn-secondary">
+            <i class="fa-solid fa-arrows-rotate"></i> Reload Data
+          </button>
+        </div>
+      </header>
+
+      <!-- VIEW 1: Dashboard Section -->
+      <section id="view-dashboard" class="content-view active">
+        <!-- Quick Stats Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon purple"><i class="fa-solid fa-folder-open"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Total Test Cases</span>
+              <span class="stat-value" id="stat-total-games">-</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="fa-solid fa-robot"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Models Tested</span>
+              <span class="stat-value" id="stat-total-models">-</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Avg Accuracy</span>
+              <span class="stat-value" id="stat-avg-accuracy">-</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><i class="fa-solid fa-bolt"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Fastest Model</span>
+              <span class="stat-value" id="stat-fastest-model">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h2>Model Reasoning Accuracy</h2>
+              <p>Percentage of runs generating a valid, shortest path (correct) and matches expected moves exactly.</p>
+            </div>
+            <div class="chart-container">
+              <canvas id="accuracy-chart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">
+              <h2>Average Latency (Seconds)</h2>
+              <p>Average time taken per test case. Lower numbers indicate faster generation speeds.</p>
+            </div>
+            <div class="chart-container">
+              <canvas id="latency-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Summary Table -->
+        <div class="table-card">
+          <div class="card-header">
+            <h2>Benchmarked Models</h2>
+            <p>Aggregated benchmark metrics across all generated test cases.</p>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table" id="models-summary-table">
+              <thead>
+                <tr>
+                  <th>Model Name</th>
+                  <th>Accuracy (Valid Paths)</th>
+                  <th>Exact Matches</th>
+                  <th>Optimal Path Rate</th>
+                  <th>Avg Latency</th>
+                  <th>Test Cases Run</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Populated dynamically by JS -->
+                <tr class="table-loading-row"><td colspan="6" style="text-align: center; padding: 2rem;">Loading data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: Test Cases Section -->
+      <section id="view-test-cases" class="content-view">
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-input-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="filter-search" placeholder="Search test case IDs or prompts...">
+          </div>
+          <div class="filters-group">
+            <select id="filter-difficulty">
+              <option value="all">All Difficulties</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+            <select id="filter-status">
+              <option value="all">All Statuses</option>
+              <option value="correct">All Correct (Valid & Optimal)</option>
+              <option value="incorrect">Any Failed</option>
+              <option value="exact">Exact Matches</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Test Cases Grid -->
+        <div class="test-cases-grid" id="test-cases-list">
+          <!-- Populated dynamically by JS -->
+          <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
+            <i class="fa-solid fa-spinner fa-spin fa-2x"></i>
+            <p style="margin-top: 1rem;">Loading test cases...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Game Visualizer Section -->
+      <section id="view-visualizer" class="content-view">
+        <div class="visualizer-container">
+          
+          <!-- Left Panel: Grid & Animation Controls -->
+          <div class="visualizer-board-section">
+            <div class="board-card">
+              <div class="board-header">
+                <span class="badge" id="viz-game-difficulty">Hard</span>
+                <h2 id="viz-game-id">dynaboard-123-0-1</h2>
+                <div class="viz-model-select-wrapper">
+                  <label for="viz-model-select">Visualizing:</label>
+                  <select id="viz-model-select">
+                    <!-- Populated dynamically -->
+                  </select>
+                </div>
+              </div>
+              
+              <!-- The Grid Board -->
+              <div class="board-grid-wrapper">
+                <div id="game-board" class="board-grid">
+                  <!-- Generated dynamically in JS -->
+                </div>
+              </div>
+
+              <!-- Replayer Controls -->
+              <div class="replayer-controls">
+                <div class="progress-bar-wrapper">
+                  <span class="time-label" id="current-step-label">Step 0 / 0</span>
+                  <input type="range" id="step-timeline" min="0" max="0" value="0">
+                </div>
+                <div class="controls-row">
+                  <div class="playback-buttons">
+                    <button class="btn btn-icon" id="btn-prev-step" title="Previous Step">
+                      <i class="fa-solid fa-backward-step"></i>
+                    </button>
+                    <button class="btn btn-icon btn-primary" id="btn-play-pause" title="Play Animation">
+                      <i class="fa-solid fa-play"></i>
+                    </button>
+                    <button class="btn btn-icon" id="btn-next-step" title="Next Step">
+                      <i class="fa-solid fa-forward-step"></i>
+                    </button>
+                    <button class="btn btn-icon" id="btn-reset-timeline" title="Reset to Start">
+                      <i class="fa-solid fa-arrow-rotate-left"></i>
+                    </button>
+                  </div>
+                  <div class="speed-control">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <select id="playback-speed" aria-label="Playback Speed">
+                      <option value="1500">Slow (1.5s)</option>
+                      <option value="1000" selected>Normal (1.0s)</option>
+                      <option value="500">Fast (0.5s)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Turn log details -->
+            <div class="step-explanation-card">
+              <h3>Current Step Status</h3>
+              <div id="step-explanation-content" class="step-explanation-body">
+                Select a step on the timeline or click play to begin visualization.
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Panel: Specs & Collapsible Logs -->
+          <div class="visualizer-details-section">
+            <!-- Tabs for Specifications & Model Run details -->
+            <div class="panel-tabs">
+              <button class="tab-btn active" data-tab="tab-specs" id="tab-btn-specs">Game Specifications</button>
+              <button class="tab-btn" data-tab="tab-logs" id="tab-btn-logs">Model Logs</button>
+            </div>
+
+            <!-- Tab Content 1: Game Specs -->
+            <div id="tab-specs" class="tab-content active">
+              <div class="info-block">
+                <h3>Board Config</h3>
+                <div class="info-grid">
+                  <div class="info-item"><span class="label">Dimensions:</span><span id="viz-spec-dims">-</span></div>
+                  <div class="info-item"><span class="label">Start Coord:</span><span id="viz-spec-start">-</span></div>
+                  <div class="info-item"><span class="label">Goal Coord:</span><span id="viz-spec-goal">-</span></div>
+                  <div class="info-item"><span class="label">Wind effect:</span><span id="viz-spec-wind">-</span></div>
+                </div>
+              </div>
+
+              <div class="info-block">
+                <h3>Portals</h3>
+                <ul class="spec-list" id="viz-spec-portals">
+                  <li>No portals on this board.</li>
+                </ul>
+              </div>
+
+              <div class="info-block">
+                <h3>Turn Rules Cycle</h3>
+                <div class="rules-cycle-list" id="viz-spec-rules">
+                  <!-- Populated dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab Content 2: Logs (Prompt, Reasoning, Output) -->
+            <div id="tab-logs" class="tab-content">
+              <!-- Prompt (collapsible) -->
+              <div class="collapsible-log">
+                <button class="collapsible-trigger" id="log-prompt-trigger">
+                  <span><i class="fa-solid fa-envelope-open-text icon-muted"></i> Natural Language Prompt</span>
+                  <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                </button>
+                <div class="collapsible-body" id="log-prompt-body">
+                  <pre><code id="log-prompt-code">...</code></pre>
+                </div>
+              </div>
+
+              <!-- Output (collapsible) -->
+              <div class="collapsible-log">
+                <button class="collapsible-trigger" id="log-output-trigger">
+                  <span><i class="fa-solid fa-terminal icon-muted"></i> Raw JSON Output</span>
+                  <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                </button>
+                <div class="collapsible-body" id="log-output-body">
+                  <pre><code id="log-output-code">...</code></pre>
+                </div>
+              </div>
+
+              <!-- Reasoning (collapsible, initially open) -->
+              <div class="collapsible-log open">
+                <button class="collapsible-trigger" id="log-reasoning-trigger">
+                  <span><i class="fa-solid fa-brain icon-muted"></i> Model Reasoning Steps</span>
+                  <i class="fa-solid fa-chevron-down arrow-icon"></i>
+                </button>
+                <div class="collapsible-body" id="log-reasoning-body">
+                  <div class="reasoning-display" id="log-reasoning-text">
+                    ...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
